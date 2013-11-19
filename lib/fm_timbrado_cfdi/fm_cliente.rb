@@ -33,6 +33,7 @@ module FmTimbradoCfdi
           "UserID" => user_id, 
           "emisorRFC" => rfc_emisor,
           "text2CFDI" => text_to_cfdi,
+          "generarTXT"  => true,
           "generarCBB" => generar_cbb
         } }
       end # response
