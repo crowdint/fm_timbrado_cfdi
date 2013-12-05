@@ -34,6 +34,7 @@ module FmTimbradoCfdi
           "emisorRFC" => rfc_emisor,
           "text2CFDI" => text_to_cfdi,
           "generarTXT"  => true,
+          "generarPDF"  => true,
           "generarCBB" => generar_cbb
         } }
       end # response
