@@ -5,100 +5,94 @@ require 'fm_timbrado_cfdi/fm_timbre'
 
 module FmTimbradoCfdi
   class FmRespuesta
-    attr_reader :errors, :pdf, :xml, :cbb, :timbre, :no_csd_emisor 
+    attr_reader :errors, :pdf, :xml, :cbb, :timbre, :no_csd_emisor
     def initialize(savon_response)
-      #inicializamos el estado del objeto
       parse(savon_response)
-    end #initialize
+    end
 
     def parse (savon_response)
-      @error = false
       @errors = []
       begin
-        #vemos si la petción fue correcta
         if savon_response.success? then
-          #cargamos la respuesta en xml
           @doc = Nokogiri::XML(savon_response.to_xml)
-          #Parseamos el nodo xml
-          if not @doc.xpath("//xml").empty? then
-            @xml = Base64::decode64 @doc.xpath("//xml")[0].content
-            # tratamos de obtener el no de serie del CSD del emisor
-            begin
-              factura_xml = Nokogiri::XML(@xml)
-              @no_csd_emisor = factura_xml.xpath("//cfdi:Comprobante").attribute('noCertificado').value
-            rescue Exception => e
-              @no_csd_emisor = nil
-              @error = true
-              @errors << "No se ha podido obtener el CSD del emisor"
-            end
-          else
-            @xml = nil
-            @error = true
-            @errors << "No se ha encontrado el nodo xml"
-          end
-          #Parseamos el nodo timbre
-          if not @doc.xpath("//txt").empty? then
-            @timbre = FmTimbre.new Base64::decode64( @doc.xpath("//txt")[0].content ) 
-          else
-            @timbre = nil
-            @error = true
-            @errors << "No se ha encontrado el nodo para el timbre fiscal"
-          end
-          #Parseamos el nodo pdf
-          if not @doc.xpath("//pdf").empty? then
-            @pdf = Base64::decode64 @doc.xpath("//pdf")[0].content
-          else
-            @pdf = nil
-            @error = true unless not @doc.xpath("//png").empty? 
-            @errors << "No se ha encontrado el nodo para la imagen cbb" unless not @doc.xpath("//png").empty? 
-          end
-          #Parseamos el nodo cbb
-          if not @doc.xpath("//png").empty? then
-            @cbb = Base64::decode64 @doc.xpath("//png")[0].content
-          else
-            @cbb = nil
-            @error = true unless not @doc.xpath("//pdf").empty? 
-            @errors << "No se ha encontrado el nodo para el archivo pdf" unless not @doc.xpath("//pdf").empty? 
-          end
+          @xml = obtener_xml(@doc)
+          @no_csd_emisor = obtener_no_csd_emisor(@xml) if @xml
+          @timbre = obtener_timbre(@xml)
+          @pdf = obtener_pdf(@doc)
+          @cbb = obtener_cbb(@doc)
         else
-          @error = true
-          @errors << savon_response.soap_fault.to_s if savon_response.soap_fault.present?
-          @pdf = nil
-          @xml = nil
-          @cbb = nil
-          @timbre = nil
-          @no_csd_emisor = nil
-          #@errors << savon_response.http_error.to_s if savon_response.http_error.present?
+          @errors << savon_response.soap_fault.to_s if savon_response.soap_fault?
+          @doc = @xml = @no_csd_emisor = @timbre = @pdf = @cbb = nil
         end
-
       rescue Exception => e
-        @error = true
         @errors << "No se ha podido realizar el parseo de la respuesta. #{e.message}"
       end
-    end #parse
+    end
 
     def valid?
-      not @error
+      @errors.empty?
     end
 
-    def xml_present?
-      not @xml.nil?
+    def xml?
+      !!@xml
+    end
+    alias :xml_present? :xml?
+
+    def cbb?
+      !!@cbb
+    end
+    alias :cbb_present? :cbb?
+
+    def pdf?
+      !!@pdf
+    end
+    alias :pdf_present? :pdf?
+
+    def timbre?
+      !!@timbre
+    end
+    alias :timbre_present? :timbre?
+
+    def no_csd_emisor?
+      !!@no_csd_emisor
+    end
+    alias :no_csd_emisor_present? :no_csd_emisor?
+
+    private
+
+    def obtener_xml(doc)
+      unless doc.xpath("//xml").empty? then
+        Base64::decode64 doc.xpath("//xml")[0].content
+      else
+        @errors << "No se ha encontrado el nodo xml"
+        nil
+      end
     end
 
-    def cbb_present?
-      not @cbb.nil?
+    def obtener_timbre(xml)
+      FmTimbre.new(xml) if xml
     end
 
-    def pdf_present?
-      not @pdf.nil?
+    def obtener_pdf(doc)
+      unless doc.xpath("//pdf").empty?
+        Base64::decode64 doc.xpath("//pdf")[0].content
+      end
     end
 
-    def timbre_present?
-      not @timbre.nil?
+    def obtener_cbb(doc)
+      unless doc.xpath("//png").empty?
+        Base64::decode64 doc.xpath("//png")[0].content
+      end
     end
 
-    def no_csd_emisor_present?
-      not @no_csd_emisor.nil?
+    def obtener_no_csd_emisor(xml)
+      begin
+        factura_xml = Nokogiri::XML(xml)
+        factura_xml.xpath("//cfdi:Comprobante").attribute('noCertificado').value
+      rescue Exception => e
+        @errors << "No se ha podido obtener el CSD del emisor"
+        nil
+      end
     end
-  end #class
-end #module
+  end
+end

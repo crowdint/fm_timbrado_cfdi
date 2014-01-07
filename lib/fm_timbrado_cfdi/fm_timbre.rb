@@ -6,50 +6,75 @@ module FmTimbradoCfdi
     attr_reader :no_certificado_sat, :fecha_timbrado, :uuid, :sello_sat, :sello_cfd, :fecha_comprobante, :serie, :folio, :trans_id
 
     def initialize ( nodo_timbre )
-      parse( nodo_timbre ) 
-    end # initialize
-    
+      parse( nodo_timbre )
+    end
+
     def parse ( nodo_timbre )
-      valores = nodo_timbre.split("\n")
-      return unless valores.size == 9
+      xml = Nokogiri::XML(nodo_timbre)
+      ns = generar_namespaces(xml)
+      atributos.each do |variable|
+        instance_variable_set("@#{variable}", send("obtener_#{variable}", xml, ns))
+      end
+    end
 
-      # TransID
-      temp_value = valores[0].chomp.split('|')
-      @trans_id = temp_value[1] if temp_value.size > 1
+    private
 
-      # noCertificadoSAT
-      temp_value = valores[1].chomp.split('|')
-      @no_certificado_sat = temp_value[1] if temp_value.size > 1
+    def generar_namespaces(xml)
+      namespaces = xml.collect_namespaces
+      ns = {}
+      namespaces.each_pair do |key, value|
+        ns[key.sub(/^xmlns:/, '')] = value
+      end
+      ns
+    end
 
-      # FechaTimbrado
-      temp_value = valores[2].chomp.split('|')
-      @fecha_timbrado = temp_value[1] if temp_value.size > 1
+    def atributos
+      [ 'trans_id',
+        'no_certificado_sat',
+        'fecha_timbrado',
+        'uuid',
+        'sello_sat',
+        'sello_cfd',
+        'fecha_comprobante',
+        'serie',
+        'folio' ]
+    end
 
-      # uuid
-      temp_value = valores[3].chomp.split('|')
-      @uuid = temp_value[1] if temp_value.size > 1
+    def obtener_trans_id(xml,ns)
+      xml.xpath("//cfdi:Comprobante",ns).attribute('TransID').value rescue nil
+    end
 
-      # selloSAT
-      temp_value = valores[4].chomp.split('|')
-      @sello_sat = temp_value[1] if temp_value.size > 1
+    def obtener_no_certificado_sat(xml, ns)
+      xml.xpath("//tfd:TimbreFiscalDigital", ns).attribute('noCertificadoSAT').value rescue nil
+    end
 
-      # selloCFD 
-      temp_value = valores[5].chomp.split('|')
-      @sello_cfd = temp_value[1] if temp_value.size > 1
+    def obtener_uuid(xml,ns)
+      xml.xpath("//tfd:TimbreFiscalDigital", ns).attribute('UUID').value rescue nil
+    end
 
-      # Fecha
-      temp_value = valores[6].chomp.split('|')
-      @fecha_comprobante = temp_value[1] if temp_value.size > 1
+    def obtener_fecha_timbrado(xml, ns)
+      xml.xpath("//tfd:TimbreFiscalDigital", ns).attribute('FechaTimbrado').value rescue nil
+    end
 
-      # Serie
-      temp_value = valores[7].chomp.split('|')
-      @serie = temp_value[1] if temp_value.size > 1
+    def obtener_sello_sat(xml, ns)
+      xml.xpath("//tfd:TimbreFiscalDigital", ns).attribute('selloSAT').value rescue nil
+    end
 
-      # folio
-      temp_value = valores[8].chomp.split('|')
-      @folio = temp_value[1] if temp_value.size > 1
-    end # parse
+    def obtener_fecha_comprobante(xml, ns)
+      xml.xpath("//cfdi:Comprobante", ns).attribute('fecha').value rescue nil
+    end
 
-  end # class
-end # module
+    def obtener_sello_cfd(xml, ns)
+      xml.xpath("//tfd:TimbreFiscalDigital", ns).attribute('selloCFD').value rescue nil
+    end
+
+    def obtener_serie(xml, ns )
+      xml.xpath("//cfdi:Comprobante", ns).attribute('serie').value rescue nil
+    end
+
+    def obtener_folio(xml, ns)
+      xml.xpath("//cfdi:Comprobante", ns).attribute('folio').value rescue nil
+    end
+  end
+end
 
